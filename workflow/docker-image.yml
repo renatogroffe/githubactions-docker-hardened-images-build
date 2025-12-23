@@ -1,0 +1,53 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  IMAGE_DOCKERHUB: ${{ secrets.DOCKERHUB_USERNAME }}/dotnet10-dhi-job-httprequest
+  DIR_WEBAPP: './src/ConsoleAppJobHttpRequest'
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Login to the Docker Hardened Images registry -- Login no registry do Docker Hardened Images
+      uses: docker/login-action@v3.6.0
+      with:
+        registry: dhi.io
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_PAT }}
+    - name: Image build -- Build de imagem
+      run: |
+        cd ${{ env.DIR_WEBAPP }}
+        docker build . --file Dockerfile --tag ${{ env.IMAGE_DOCKERHUB }}:latest
+    - name: Login to Docker Hub (to publish the image) -- Login no Docker Hub (para publicar a imagem)
+      uses: docker/login-action@v3.6.0
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_PAT }}
+    - name: Generating a tag with the Build and Push number on Docker Hub -- Geração de tag com número do Build e Push no Docker Hub
+      run: |
+        docker tag ${{ env.IMAGE_DOCKERHUB }}:latest ${{ env.IMAGE_DOCKERHUB }}:$GITHUB_RUN_NUMBER
+        docker push --all-tags ${{ env.IMAGE_DOCKERHUB }}
+
+  tests:
+
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+    - name: Criar um container testando a aplicação
+      run: | 
+        docker run --name container01 ${{ env.IMAGE_DOCKERHUB }}:$GITHUB_RUN_NUMBER
+    - name: Show containers in the environment -- Exibir containers no ambiente
+      run: docker ps -a
+    - name: Show images in the environment -- Exibir imagens no ambiente
+      run: docker images
